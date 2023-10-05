@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.7/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/e4195be23f.js" crossorigin="anonymous"></script>
+    <title>Weather App</title>
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto py-8">
+        <h1 class="text-3xl text-blue-600 mb-4">Weather App</h1>
+        <div class="flex space-x-2 mb-4">
+            <input type="text" id="city-input" placeholder="Enter a city" class="border p-2 rounded-l-lg flex-1">
+            <button onclick="getWeather()" class="bg-blue-500 text-white p-2 rounded-r-lg">Get Weather</button>
+        </div>
+        <div id="weather-info" class="bg-white p-4 rounded-lg shadow-md">
+            <!-- Weather information will be displayed here -->
+        </div>
+        <div id="forecast-container" class="mt-4">
+            <!-- 5-day forecast will be displayed here -->
+        </div>
+        <div id="search-history" class="mt-4">
+            <h2 class="text-xl font-semibold mb-2">Search History:</h2>
+            <div id="history-buttons">
+                <!-- Search history buttons will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to save the searched city to local storage
+        function saveToLocalStorage(city) {
+            let searchHistory = JSON.parse(localStorage.getItem('searchHistory')) || [];
+            if (!searchHistory.includes(city)) {
+                searchHistory.push(city);
+                localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+                displaySearchHistory();
+            }
+        }
+
+        // Function to display the search history buttons
+        function displaySearchHistory() {
+            const historyButtons = document.getElementById('history-buttons');
+            historyButtons.innerHTML = '';
+            const searchHistory = JSON.parse(localStorage.getItem('searchHistory')) || [];
+
+            searchHistory.forEach(city => {
+                const button = document.createElement('button');
+                button.textContent = city;
+                button.addEventListener('click', () => {
+                    document.getElementById('city-input').value = city;
+                    getWeather();
+                });
+                button.classList.add('bg-blue-500', 'text-white', 'p-2', 'rounded', 'mr-2', 'mb-2', 'cursor-pointer');
+                historyButtons.appendChild(button);
+            });
+        }
+
+        // Call the displaySearchHistory function when the page loads
+        window.addEventListener('load', displaySearchHistory);
+
+        // Function to get weather data
+        function getWeather() {
+            const apiKey = '8c3b28b26eb8c043949d0967bf7e7a6e';
+            const city = document.getElementById('city-input').value;
+            const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`;
+            const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}&units=imperial`;
+
+            // Save the searched city to local storage
+            saveToLocalStorage(city);
+
+            // Fetch current weather
+            fetch(weatherUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const weatherInfo = document.getElementById('weather-info');
+                    const weatherDescription = data.weather[0].description.toLowerCase();
+
+                    // Map weather descriptions to FontAwesome icons
+                    const weatherIconClass = getWeatherIconClass(weatherDescription);
+
+                    weatherInfo.innerHTML = `
+                        <h2 class="text-2xl font-semibold">Weather in ${data.name}, ${data.sys.country}</h2>
+                        <p class="text-lg"><i class="${weatherIconClass} fa-2x text-blue-600"></i> Temperature: ${data.main.temp}°F</p>
+                        <p class="text-lg">Weather: ${data.weather[0].description}</p>
+                        <p class="text-lg"><i class="fas fa-tint fa-2x text-blue-600"></i> Humidity: ${data.main.humidity}%</p>
+                        <p class="text-lg"><i class="fas fa-wind fa-2x text-blue-600"></i> Wind Speed: ${data.wind.speed} mph</p>
+                    `;
+                })
+                .catch(error => {
+                    console.error('Error fetching current weather data:', error);
+                });
+
+            // Fetch 5-day forecast
+            fetch(forecastUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const forecastContainer = document.getElementById('forecast-container');
+                    forecastContainer.innerHTML = '';
+
+                    // Display forecast for the next 5 days
+                    for (let i = 0; i < data.list.length; i += 8) {
+                        const forecastItem = data.list[i];
+                        const date = new Date(forecastItem.dt * 1000); // Convert timestamp to date
+                        const day = date.toLocaleDateString('en-US', { weekday: 'short' });
+                        const temp = forecastItem.main.temp.toFixed(0);
+                        const description = forecastItem.weather[0].description;
+
+                        // Create and append forecast item to the container
+                        const forecastElement = document.createElement('div');
+                        forecastElement.classList.add('bg-white', 'p-4', 'rounded-lg', 'shadow-md', 'text-center', 'mb-2');
+                        forecastElement.innerHTML = `
+                            <h3 class="text-lg font-semibold">${day}</h3>
+                            <p class="text-lg"><i class="${getWeatherIconClass(description)} fa-2x text-blue-600"></i> ${temp}°F</p>
+                            <p class="text-lg">${description}</p>
+                        `;
+                        forecastContainer.appendChild(forecastElement);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching 5-day forecast data:', error);
+                });
+        }
+
+        // Function to map weather descriptions to FontAwesome icons
+        function getWeatherIconClass(description) {
+            const lowercaseDescription = description.toLowerCase();
+            if (lowercaseDescription.includes('clear')) {
+                return 'fas fa-sun'; // Sunny icon
+            } else if (lowercaseDescription.includes('cloud')) {
+                return 'fas fa-cloud'; // Cloudy icon
+            } else if (lowercaseDescription.includes('rain')) {
+                return 'fas fa-cloud-rain'; // Rainy icon
+            } else if (lowercaseDescription.includes('thunderstorm')) {
+                return 'fas fa-bolt'; // Thunderstorm icon
+            } else if (lowercaseDescription.includes('snow')) {
+                return 'fas fa-snowflake'; // Snow icon
+            } else {
+                return 'fas fa-question'; // Default icon if description doesn't match
+            }
+        }
+    </script>
+</body>
+
+</html>
